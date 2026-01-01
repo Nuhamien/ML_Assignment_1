@@ -1,30 +1,43 @@
-from fastapi import FastAPI
-from pydantic import BaseModel
+import os
 import joblib
 import numpy as np
+from fastapi import FastAPI
+from mangum import Mangum
+from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 
+# 1. FIX: Setup absolute paths for Vercel deployment
+# This finds the folder where this main.py file is sitting
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+def get_model_path(filename):
+    return os.path.join(BASE_DIR, filename)
+
+# 2. FIX: Load models using the absolute path
+try:
+    lr_model = joblib.load(get_model_path("loan_lr_model.joblib"))
+    dt_model = joblib.load(get_model_path("loan_dt_model.joblib"))
+    scaler = joblib.load(get_model_path("loan_scaler.joblib"))
+    print("Successfully loaded models from:", BASE_DIR)
+except Exception as e:
+    print(f"CRITICAL ERROR loading models: {e}")
+
 # Enable CORS for frontend access
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"], # In production, replace with your frontend URL
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Load your Loan models
-lr_model = joblib.load("loan_lr_model.joblib")
-dt_model = joblib.load("loan_dt_model.joblib")
-scaler = joblib.load("loan_scaler.joblib")
-
 class LoanInput(BaseModel):
-    gender: int        # 0: Female, 1: Male
-    married: int       # 0: No, 1: Yes
-    dependents: int    # 0, 1, 2, 3
-    education: int     # 0: Graduate, 1: Not Graduate
-    self_employed: int # 0: No, 1: Yes
+    gender: int         # 0: Female, 1: Male
+    married: int        # 0: No, 1: Yes
+    dependents: int     # 0, 1, 2, 3
+    education: int      # 0: Graduate, 1: Not Graduate
+    self_employed: int  # 0: No, 1: Yes
     applicant_income: float
     coapplicant_income: float
     loan_amount: float
@@ -63,3 +76,6 @@ def predict_loan(data: LoanInput):
 @app.get("/")
 def home():
     return {"message": "Loan Prediction API is Live!"}
+
+# 3. FIX: Create the handler for Vercel (Mangum)
+handler = Mangum(app)

@@ -1,5 +1,5 @@
 fastapi
-uvicorn
+mangum
 joblib
 scikit-learn
 numpy
